@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TapControl Field — S19.0 — Engetap</title>
+<title>TapControl Field — S19.1 — Engetap</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -909,6 +909,34 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 </div>
 
 <!-- ════════════════════════════════════════════════════════════ -->
+<!-- T6eq — ITENS DO EQUIPAMENTO (perguntado uma vez/equipamento)-->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="screen hidden" id="scr-t6eq">
+  <div class="hdr">
+    <div class="hdr-back" onclick="goBack('t6eq')">‹</div>
+    <div class="hdr-info">
+      <div class="hdr-title">Itens do Equipamento</div>
+      <div class="hdr-sub" id="t6eq-equip-name">Equipamento</div>
+    </div>
+    <div class="hdr-badge">T6eq</div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-track"><div class="progress-fill" style="width:30%"></div></div>
+    <div class="progress-label">Itens do equipamento</div>
+  </div>
+  <div class="body">
+    <p class="sec-label" style="margin-bottom:8px">
+      Selecione os itens de identificação necessários para este equipamento.<br>
+      <span style="font-size:12px;color:var(--text3)">Esta pergunta aparece uma única vez por equipamento.</span>
+    </p>
+    <div id="t6eq-itens-grid" style="display:flex;flex-direction:column;gap:8px"></div>
+  </div>
+  <div class="bot bot-single">
+    <button class="btn btn-primary" onclick="t6eqConfirmar()">Confirmar →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
 <!-- T7 — SITUAÇÃO DA PEÇA                                       -->
 <!-- ════════════════════════════════════════════════════════════ -->
 <div class="screen hidden" id="scr-t7">
@@ -1728,6 +1756,8 @@ async function selectOS(id) {
   }
 
   SES.levantamento = {};
+  SES.itensEquipamento = {};               // S19.1
+  SES.itensEquipamento_perguntados = {};   // S19.1
 
   // [CANCELAMENTO_ENVIO] BUG1-FIX: verificar se existe snapshot pré-envio para esta OS.
   // Se existir, restaurar os itens já preenchidos em vez de zerar o levantamento.
@@ -2616,22 +2646,32 @@ function t6bConfirmarConexoes() {
 // ════════════════════════════════════════════════════════════════
 // T6c — ITENS ADICIONAIS
 // ════════════════════════════════════════════════════════════════
+// S19.1 — itens perguntados UMA VEZ por equipamento (tela T6eq)
+const ITENS_EQUIPAMENTO_PADRAO = [
+  { id: 'placa_indelevel', label: 'Placa Indelével',         desc: 'Identificação permanente gravada em metal/plástico resistente', icon: '🏷️' },
+  { id: 'placa_tag',       label: 'Placa de Tag / Categoria', desc: 'Tag de identificação com número e categoria NR-13',            icon: '📌' },
+];
+
+// S19.1 — itens perguntados para CADA acessório (tela T6c)
 const ITENS_ADICIONAIS_PADRAO = [
-  { id: 'placa_indelevel',  label: 'Placa Indelével', desc: 'Identificação permanente gravada em metal/plástico resistente', icon: '🏷️' },
-  { id: 'placa_tag',        label: 'Placa de Tag / Categoria', desc: 'Tag de identificação com número e categoria NR-13', icon: '📌' },
-  { id: 'lacre_seguranca',  label: 'Lacre de Segurança', desc: 'Lacre para sinalização de abertura não autorizada', icon: '🔒' },
-  { id: 'certificado',      label: 'Certificado de Calibração', desc: 'Documento de rastreabilidade metrológica', icon: '📄' },
-  { id: 'suporte',          label: 'Suporte / Sela de fixação', desc: 'Suporte para fixação do instrumento', icon: '⚙️' },
-  { id: 'silicone_veda',    label: 'Fita Veda-rosca / Silicone', desc: 'Material de vedação para conexões', icon: '🔧' },
-  { id: 'manopla',          label: 'Manopla de bloqueio', desc: 'Manopla para bloqueio manual do instrumento', icon: '🕹️' },
-  { id: 'outro_adicional',  label: 'Outro item', desc: 'Item não listado — descreva abaixo', icon: '📦' },
+  { id: 'kit_instalacao',  label: 'Kit de instalação',       desc: 'Selecione se este acessório necessita de kit de instalação',   icon: '🩹' },
+  { id: 'lacre_seguranca', label: 'Lacre de Segurança',      desc: 'Lacre para sinalização de abertura não autorizada',            icon: '🔒' },
+  { id: 'certificado',     label: 'Certificado de Calibração', desc: 'Documento de rastreabilidade metrológica',                   icon: '📄' },
+  { id: 'suporte',         label: 'Suporte / Sela de fixação', desc: 'Suporte para fixação do instrumento',                        icon: '⚙️' },
+  { id: 'silicone_veda',   label: 'Fita Veda-rosca / Silicone', desc: 'Material de vedação para conexões',                        icon: '🔧' },
+  { id: 'manopla',         label: 'Manopla de bloqueio',     desc: 'Manopla para bloqueio manual do instrumento',                  icon: '🕹️' },
+  { id: 'outro_adicional', label: 'Outro item',              desc: 'Item não listado — descreva abaixo',                          icon: '📦' },
 ];
 
 function renderT6c() {
   SES.itensAdicionais = SES.itensAdicionais || {};
   document.getElementById('t6c-item-name').textContent = SES.itemCatalogo?.desc_curta || 'Acessório';
   const el = document.getElementById('t6c-itens-grid');
-  el.innerHTML = ITENS_ADICIONAIS_PADRAO.map(item => `
+  // S19.1 — kit_instalacao só para purgadores (manômetro/válvula já têm T5b)
+  const lista = ITENS_ADICIONAIS_PADRAO.filter(
+    item => item.id !== 'kit_instalacao' || SES.tipo === 'purgador'
+  );
+  el.innerHTML = lista.map(item => `
     <div class="kit-opt ${SES.itensAdicionais[item.id]?'sel':''}" id="t6c-${item.id}"
          onclick="t6cToggle('${item.id}',this)" style="display:flex;align-items:center;gap:12px;padding:12px">
       <div style="font-size:24px">${item.icon}</div>
@@ -2665,12 +2705,65 @@ function t6cConfirmar() {
   _renderT7();
 }
 
-function goToT7() {
+// ════════════════════════════════════════════════════════════════
+// T6eq — ITENS DO EQUIPAMENTO (S19.1)
+// ════════════════════════════════════════════════════════════════
+function renderT6eq() {
+  SES.itensEquipamento = SES.itensEquipamento || {};
+  document.getElementById('t6eq-equip-name').textContent =
+    SES.equip.tag + ' · ' + (EQUIP_TIPO_LABEL[SES.equip.tipo] || '');
+  const el = document.getElementById('t6eq-itens-grid');
+  el.innerHTML = ITENS_EQUIPAMENTO_PADRAO.map(item => `
+    <div class="kit-opt ${SES.itensEquipamento[item.id]?'sel':''}" id="t6eq-${item.id}"
+         onclick="t6eqToggle('${item.id}',this)"
+         style="display:flex;align-items:center;gap:12px;padding:12px">
+      <div style="font-size:24px">${item.icon}</div>
+      <div style="flex:1">
+        <div style="font-weight:600;font-size:13px">${item.label}</div>
+        <div style="font-size:11px;color:var(--text3)">${item.desc}</div>
+      </div>
+      <div style="font-size:18px">${SES.itensEquipamento[item.id]?'✓':'○'}</div>
+    </div>`).join('');
+  goTo('t6eq');
+}
+
+function t6eqToggle(id, el) {
+  SES.itensEquipamento = SES.itensEquipamento || {};
+  SES.itensEquipamento[id] = !SES.itensEquipamento[id];
+  el.classList.toggle('sel', SES.itensEquipamento[id]);
+  el.querySelector('[style*="font-size:18px"]').textContent =
+    SES.itensEquipamento[id] ? '✓' : '○';
+}
+
+function t6eqConfirmar() {
+  SES.itensEquipamento_perguntados = SES.itensEquipamento_perguntados || {};
+  SES.itensEquipamento_perguntados[SES.equip.id_equipamento] = true;
+  const cb = SES._t6eq_callback || goToT6c;
+  SES._t6eq_callback = null;
+  cb();
+}
+
+function goToT6eq_seNecessario(callback) {
+  SES.itensEquipamento_perguntados = SES.itensEquipamento_perguntados || {};
+  if (!SES.itensEquipamento_perguntados[SES.equip.id_equipamento]) {
+    SES._t6eq_callback = callback;
+    renderT6eq();
+  } else {
+    callback();
+  }
+}
+
+function goToT6c() {
   if (['manometro','valvula','purgador'].includes(SES.tipo)) {
     renderT6c();
   } else {
     _renderT7();
   }
+}
+
+// S19.1 — fluxo: T6b → T6eq (1ª vez por equip) → T6c → T7
+function goToT7() {
+  goToT6eq_seNecessario(goToT6c);
 }
 
 function _renderT7() {
@@ -2788,6 +2881,7 @@ function saveCurrentItemToLevantamento() {
     instalado_imediatamente: SES.situacao === 'agora' ? 'true' : 'false',
     conexoes_montagem: JSON.stringify(SES.conexoesMontagem || []),
     itens_adicionais: JSON.stringify(SES.itensAdicionais || {}),
+    itens_equipamento: JSON.stringify(SES.itensEquipamento || {}),  // S19.1
     // [OUTRO_TIPO] S17 — marca explícita para renderização correta na revisão
     _veio_de_outro: (SES.tipo === 'outro') ? 'true' : 'false',
   });
@@ -2989,7 +3083,7 @@ async function cancelarEnvioOS(idOS) {
 }
 
 function novaOS() {
-  SES.os = null; SES.equipamentos = []; SES.levantamento = {}; SES.history = [];
+  SES.os = null; SES.equipamentos = []; SES.levantamento = {}; SES.itensEquipamento = {}; SES.itensEquipamento_perguntados = {}; SES.history = [];
   renderT2();
 }
 
