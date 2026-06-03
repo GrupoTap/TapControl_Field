@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TapControl Field — S20.0 — Engetap</title>
+<title>TapControl Field — S22.0 — Engetap</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -288,7 +288,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     <div class="pin-logo">
       <div class="pl-badge">FIELD</div>
       <div class="pl-name">TapControl</div>
-      <div class="pl-sub">Engetap · S20.0</div>
+      <div class="pl-sub">Engetap · S22.0</div>
     </div>
     <div class="pin-dots" id="pinDots">
       <div class="pin-dot" id="pd0"></div>
@@ -1208,7 +1208,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzaYkBqamEi21pTaBl_LYAhj9JkkxwFGfapWMrUCnfTCA7BMV9O5D0fWQeQP2fmGnKd/exec';
 
 // S17 — Correções cirúrgicas: snapshot pré-envio, reconciliação Fase 2, cache Atualizar
-const APP_VERSION = 'S20.0';
+const APP_VERSION = 'S22.0';
 
 // ════════════════════════════════════════════════════════════════
 // ESTADO DA SESSÃO
@@ -3156,9 +3156,12 @@ function saveCurrentItemToLevantamento() {
   if (!SES.levantamento[eqId]) SES.levantamento[eqId] = [];
   const kitComps = kit && Array.isArray(kit.componentes) ? kit.componentes : [];
   // [OUTRO_TIPO] S17 — preservar o tipo digitado quando item veio do fluxo "Outro"
+  // S22 — normaliza tipo para label canônico (ex: 'manometro' → 'Manômetro')
+  // Isso garante que o filtro do TCM (que compara com 'Manômetro') funcione
+  const _TIPO_ACESSORIO_LABEL = { manometro:'Manômetro', valvula:'Válvula de Segurança', purgador:'Purgador', dcbi:'DCBI', conexao:'Conexão', outro:'Item personalizado' };
   const tipoAcessorio = (SES.tipo === 'outro' && SES.outroTipo)
     ? SES.outroTipo
-    : (SES.tipo || 'outro');
+    : (_TIPO_ACESSORIO_LABEL[SES.tipo] || SES.tipo || 'Item personalizado');
   SES.levantamento[eqId].push({
     id_equipamento: eqId,
     tag_equipamento: SES.equip.tag,
