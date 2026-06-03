@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TapControl Field — S18.0 — Engetap</title>
+<title>TapControl Field — S19.0 — Engetap</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -1522,7 +1522,6 @@ function salvarRascunhoLevantamento() {
     if (!SES.os?.id_os || !SES.inspetor?.id_inspetor) return;
     const totalItens = Object.values(SES.levantamento || {}).reduce((s,a)=>s+a.length, 0);
     if (totalItens === 0) {
-      // não criar draft vazio — limpa qualquer um existente
       limparRascunhoLevantamento();
       return;
     }
@@ -1536,7 +1535,22 @@ function salvarRascunhoLevantamento() {
       levantamento: SES.levantamento || {},
       total_itens: totalItens
     };
+    // 1. Sempre salva localmente (cache primário)
     localStorage.setItem(_draftKey(), JSON.stringify(draft));
+    // S19 — 2. Salva no GAS em paralelo, não bloqueia fluxo
+    if (GAS_URL) {
+      gasPost('salvarDraftFieldTap', {
+        id_os: SES.os.id_os,
+        numero_os: SES.os.numero_os || SES.os.id_os,
+        id_inspetor: SES.inspetor.id_inspetor,
+        nome_inspetor: SES.inspetor.nome || '',
+        fase: String(SES.os.fase_atual || '1'),
+        total_itens: totalItens,
+        payload_json: JSON.stringify(draft)
+      }).catch(function() {
+        showToast('Rascunho salvo apenas neste dispositivo. Falha ao salvar no servidor.', 'warn');
+      });
+    }
   } catch(e) { console.warn('[DRAFT_LOCAL] salvar falhou:', e); }
 }
 function lerRascunhoLevantamento(idOS) {
@@ -1729,22 +1743,33 @@ async function selectOS(id) {
       limparRascunhoLevantamento(id);
     }
   } else {
-    // [DRAFT_LOCAL] S17 — sem snapshot: oferecer restaurar rascunho local se houver
-    const draft = lerRascunhoLevantamento(id);
-    if (draft && draft.total_itens > 0 && draft.levantamento) {
+    // S19 — tentar GAS primeiro; usar localStorage apenas como fallback
+    let draftParaOfeреcer = null;
+    if (GAS_URL) {
+      try {
+        const rDraft = await gasPost('getDraftFieldTap', { id_os: id, id_inspetor: SES.inspetor?.id_inspetor, fase: String(SES.os?.fase_atual || '1') });
+        if (rDraft && rDraft.status === 'ok' && rDraft.draft) {
+          const payloadGAS = rDraft.draft.payload_json ? JSON.parse(rDraft.draft.payload_json) : null;
+          if (payloadGAS && payloadGAS.levantamento) draftParaOfeреcer = payloadGAS;
+        }
+      } catch(e) { console.warn('[DRAFT_GAS] falhou, usando localStorage:', e); }
+    }
+    if (!draftParaOfeреcer) draftParaOfeреcer = lerRascunhoLevantamento(id);
+
+    if (draftParaOfeреcer && draftParaOfeреcer.total_itens > 0 && draftParaOfeреcer.levantamento) {
       const restaurar = confirm(
-        'Existe um rascunho não enviado desta OS com ' + draft.total_itens + ' item(s).\n\n' +
+        'Existe um rascunho não enviado desta OS com ' + draftParaOfeреcer.total_itens + ' item(s).\n\n' +
         'OK = Restaurar\nCancelar = Descartar e começar do zero'
       );
       if (restaurar) {
-        SES.levantamento = JSON.parse(JSON.stringify(draft.levantamento));
-        // restaura também os equipamentos do draft, caso GAS não retorne (offline)
-        if (Array.isArray(draft.equipamentos) && draft.equipamentos.length) {
-          SES._draftEquips = draft.equipamentos;
+        SES.levantamento = JSON.parse(JSON.stringify(draftParaOfeреcer.levantamento));
+        if (Array.isArray(draftParaOfeреcer.equipamentos) && draftParaOfeреcer.equipamentos.length) {
+          SES._draftEquips = draftParaOfeреcer.equipamentos;
         }
-        showToast('Rascunho restaurado: ' + draft.total_itens + ' itens recuperados', 'ok');
+        showToast('Rascunho restaurado: ' + draftParaOfeреcer.total_itens + ' itens recuperados', 'ok');
       } else {
         limparRascunhoLevantamento(id);
+        if (GAS_URL) { try { gasPost('limparDraftFieldTap', { id_os: id, id_inspetor: SES.inspetor?.id_inspetor, fase: String(SES.os?.fase_atual || '1'), motivo: 'cancelado' }); } catch(e) {} }
       }
     }
   }
@@ -2893,10 +2918,18 @@ async function enviarLevantamento(btn) {
   let enviado = false;
   try {
     const r = await gasPost('enviarLevantamento', payload);
-    if (r.status === 'ok') { levId = r.id_levantamento || levId; enviado = true; }
+    if (r && r.status === 'ok') {
+      levId = r.id_levantamento || levId;
+      enviado = true;
+    } else {
+      hideLoading();
+      showToast('Falha ao enviar. Os dados foram mantidos para nova tentativa.', 'err');
+      return;
+    }
   } catch(e) {
-    // modo offline — usa id gerado localmente; marca como enviado localmente
-    enviado = true;
+    hideLoading();
+    showToast('Falha ao enviar. Os dados foram mantidos para nova tentativa.', 'err');
+    return;
   }
   hideLoading();
 
@@ -2904,10 +2937,12 @@ async function enviarLevantamento(btn) {
   snapshot.id_levantamento = levId;
   _salvarSnapshotPreEnvio(snapshot);
 
-  // [DRAFT_LOCAL] S17 — limpar rascunho APENAS após envio bem-sucedido.
-  // Se falhou, manter rascunho para o usuário poder tentar de novo.
+  // Limpar rascunho local e do GAS após envio bem-sucedido
   if (enviado) {
     try { limparRascunhoLevantamento(SES.os.id_os); } catch(e) {}
+    if (GAS_URL) {
+      try { gasPost('limparDraftFieldTap', { id_os: SES.os.id_os, id_inspetor: SES.inspetor?.id_inspetor, fase: SES.os.fase_atual || '1' }); } catch(e) {}
+    }
   }
 
   // Sprint 8: marca a OS como levantamento enviado para sumir da lista
@@ -3125,16 +3160,13 @@ async function confirmarItemF2(btn) {
 
   if (btn) btnLoading(btn, 1500);
 
-  // Marca item como concluído
-  it._concluido = true;
-  it._dados = { acao, data, cert, lacre, obs };
-  it.status = acao === 'calibrado' ? 'calibrado' : (acao === 'entregue' ? 'entregue' : 'instalado');
+  const statusF2 = acao === 'calibrado' ? 'calibrado' : (acao === 'entregue' ? 'entregue' : 'instalado');
 
-  // Envia ao GAS
+  // S19 — Envia ao GAS PRIMEIRO; só marca concluído após status: 'ok'
   if (GAS_URL) {
     const payload = {
       id_item: it.id_item,
-      status: it.status,
+      status: statusF2,
       data_instalacao: data,
       data_calibracao: acao === 'calibrado' ? data : '',
       num_certificado: cert,
@@ -3143,9 +3175,19 @@ async function confirmarItemF2(btn) {
       responsavel: SES.inspetor?.nome || 'Inspetor'
     };
     try {
-      await gasPost('registrarInstalacao', payload);
-    } catch(e) {} // Falha silenciosa — dado já está marcado localmente
+      const r = await gasPost('registrarInstalacao', payload);
+      if (!r || r.status !== 'ok') throw new Error(r?.mensagem || 'Erro GAS');
+    } catch(e) {
+      if (btn) btn.disabled = false;
+      showToast('Não foi possível salvar a conclusão no servidor. Tente novamente.', 'err');
+      return;
+    }
   }
+
+  // Só marca concluído após confirmação do GAS (ou se sem GAS_URL)
+  it._concluido = true;
+  it._dados = { acao, data, cert, lacre, obs };
+  it.status = statusF2;
 
   closeDialog('modal-item-f2');
   renderTF2();
