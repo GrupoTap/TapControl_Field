@@ -911,7 +911,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 <!-- ════════════════════════════════════════════════════════════ -->
 <div class="screen hidden" id="scr-t6b">
   <div class="hdr">
-    <div class="hdr-back" onclick="t6bConfirmarConexoes()">‹</div>
+    <div class="hdr-back" onclick="t6bSalvarEVoltar()">‹</div>
     <div class="hdr-info">
       <div class="hdr-title">Conexões de Montagem</div>
       <div class="hdr-sub" id="t6b-item-name">Acessório</div>
@@ -1428,8 +1428,12 @@ function abrirModalFoto({ titulo, subtitulo, onConfirm, onSkip }) {
     <div style="background:var(--surf);border-radius:16px 16px 0 0;padding:20px;width:100%;max-height:85vh;overflow-y:auto">
       <div style="font-weight:800;font-size:18px;margin-bottom:6px;color:var(--text)">${titulo}</div>
       <div style="font-size:13px;color:var(--text2);line-height:1.4;margin-bottom:14px">${subtitulo}</div>
-      <input type="file" id="dlg-foto-input" accept="image/*" capture="environment" style="display:none">
-      <button class="btn btn-ghost" id="dlg-foto-btn" style="width:100%;margin-bottom:12px">📷 Tirar foto</button>
+      <input type="file" id="dlg-foto-input-camera" accept="image/*" capture="environment" style="display:none">
+      <input type="file" id="dlg-foto-input-galeria" accept="image/*" style="display:none">
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-ghost" id="dlg-foto-btn-camera" style="flex:1">📷 Tirar foto</button>
+        <button class="btn btn-ghost" id="dlg-foto-btn-galeria" style="flex:1">🖼 Galeria</button>
+      </div>
       <div id="dlg-foto-preview-wrap" style="display:none;margin-bottom:12px">
         <img id="dlg-foto-preview" alt="Prévia da foto" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;border:1px solid var(--border)">
       </div>
@@ -1439,26 +1443,33 @@ function abrirModalFoto({ titulo, subtitulo, onConfirm, onSkip }) {
       </div>
     </div>`;
   document.body.appendChild(dlg);
-  const input = document.getElementById('dlg-foto-input');
-  const btnFoto = document.getElementById('dlg-foto-btn');
+  const inputCamera  = document.getElementById('dlg-foto-input-camera');
+  const inputGaleria = document.getElementById('dlg-foto-input-galeria');
+  const btnCamera    = document.getElementById('dlg-foto-btn-camera');
+  const btnGaleria   = document.getElementById('dlg-foto-btn-galeria');
   const btnConfirm = document.getElementById('dlg-foto-confirmar');
-  btnFoto.onclick = () => input.click();
-  input.onchange = async () => {
-    const file = input.files && input.files[0];
+
+  const processarArquivo = async (file, btnRef) => {
     if (!file) return;
     try {
-      btnFoto.textContent = 'Processando foto…';
+      btnRef.textContent = 'Processando…';
       fotoBase64 = await resizeImageFileToBase64(file);
       document.getElementById('dlg-foto-preview').src = fotoBase64;
       document.getElementById('dlg-foto-preview-wrap').style.display = '';
       btnConfirm.disabled = false;
       btnConfirm.style.opacity = '1';
-      btnFoto.textContent = '📷 Trocar foto';
+      btnCamera.textContent = '📷 Trocar foto';
+      btnGaleria.textContent = '🖼 Trocar da galeria';
     } catch(e) {
-      btnFoto.textContent = '📷 Tirar foto';
+      btnRef.textContent = btnRef === btnCamera ? '📷 Tirar foto' : '🖼 Galeria';
       showToast('Não foi possível processar a foto', 'err');
     }
   };
+
+  btnCamera.onclick  = () => inputCamera.click();
+  btnGaleria.onclick = () => inputGaleria.click();
+  inputCamera.onchange  = async () => processarArquivo(inputCamera.files?.[0], btnCamera);
+  inputGaleria.onchange = async () => processarArquivo(inputGaleria.files?.[0], btnGaleria);
   document.getElementById('dlg-foto-pular').onclick = () => {
     dlg.remove();
     if (typeof onSkip === 'function') onSkip();
@@ -2912,6 +2923,12 @@ function t6bSalvarConexao(btn) {
 function t6bPularConexoes() {
   SES.conexoesMontagem = [];
   goToT7();
+}
+
+function t6bSalvarEVoltar() {
+  // Salva conexões no SES sem avançar
+  // SES.conexoesMontagem já está atualizado pelo renderT6bLista, não precisa re-parsear
+  goBack('t6b');
 }
 
 function t6bConfirmarConexoes() {
