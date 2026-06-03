@@ -254,6 +254,24 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 /* ── PULL TO REFRESH ── */
 .ptr-indicator { text-align: center; padding: 12px; font-size: 12px; color: var(--text3); display: none; }
 .ptr-indicator.visible { display: block; }
+
+/* ── TOGGLE OPTIONS (chips selecionáveis) ── */
+.toggle-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
+.tog-opt {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 9px 16px; border-radius: 20px; cursor: pointer; user-select: none;
+  font-size: 14px; font-weight: 600; font-family: var(--body);
+  background: var(--surf2); color: var(--text2);
+  border: 1.5px solid var(--border);
+  transition: background .15s, border-color .15s, color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.tog-opt:active { transform: scale(.95); opacity: .85; }
+.tog-opt.sel {
+  background: rgba(14,165,233,.15);
+  border-color: var(--accent);
+  color: var(--accent2);
+}
 </style>
 </head>
 <body>
@@ -2513,6 +2531,7 @@ function t6bAddConexao() {
   const bitolaOpts = BITOLAS_CONEXAO.map(b => `<option>${b}</option>`).join('');
   const matOpts = MATERIAIS_CONEXAO.map(m => `<option>${m}</option>`).join('');
   const dlg = document.createElement('div');
+  dlg.id = 'dlg-conexao-overlay';
   dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end';
   dlg.innerHTML = `
     <div style="background:var(--surf);border-radius:16px 16px 0 0;padding:20px;width:100%;max-height:80vh;overflow-y:auto">
@@ -2534,7 +2553,7 @@ function t6bAddConexao() {
         <input type="text" id="dlg-con-obs" placeholder="Ex: rosca interna" style="width:100%">
       </div>
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn btn-ghost" style="flex:1" onclick="this.closest('[style*=fixed]').remove()">Cancelar</button>
+        <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('dlg-conexao-overlay')?.remove()">Cancelar</button>
         <button class="btn btn-primary" style="flex:2" onclick="t6bSalvarConexao(this)">Adicionar</button>
       </div>
     </div>`;
@@ -2556,7 +2575,7 @@ function t6bSalvarConexao(btn) {
   const obs    = document.getElementById('dlg-con-obs').value.trim();
   SES.conexoesMontagem = SES.conexoesMontagem || [];
   SES.conexoesMontagem.push({ tipo, bitola, material: mat, qtd, obs });
-  btn.closest('[style*="position:fixed"]').remove();
+  document.getElementById('dlg-conexao-overlay')?.remove();
   renderT6bLista();
 }
 
