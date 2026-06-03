@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TapControl Field — S19.1 — Engetap</title>
+<title>TapControl Field — S20.0 — Engetap</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -287,8 +287,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
   <div class="body" style="display:flex;flex-direction:column;">
     <div class="pin-logo">
       <div class="pl-badge">FIELD</div>
-      <div class="pl-name">Tap</div>
-      <div class="pl-sub">Engetap · S13.1</div>
+      <div class="pl-name">TapControl</div>
+      <div class="pl-sub">Engetap · S20.0</div>
     </div>
     <div class="pin-dots" id="pinDots">
       <div class="pin-dot" id="pd0"></div>
@@ -369,6 +369,8 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     <div class="progress-label">Tipo de acessório</div>
   </div>
   <div class="body">
+    <p class="sec-label" style="margin-top:0">Serviços necessários</p>
+    <div id="t4-servicos-grid" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px"></div>
     <p class="sec-label">Selecione o tipo de acessório</p>
     <div class="type-grid">
       <div class="type-card" onclick="selectTipo('manometro')">
@@ -395,6 +397,11 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
         <div class="tc-icon">📦</div>
         <div class="tc-name">Outro</div>
       </div>
+    </div>
+    <div style="margin-top:16px">
+      <button class="btn btn-ghost" style="width:100%" onclick="abrirItensEquipamento()">
+        🏷️ Itens do Equipamento
+      </button>
     </div>
   </div>
 </div>
@@ -827,6 +834,49 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 </div>
 
 <!-- ════════════════════════════════════════════════════════════ -->
+<!-- T5-MANUAL-DCBI — Lançar DCBI manualmente                    -->
+<!-- ════════════════════════════════════════════════════════════ -->
+<div class="screen hidden" id="scr-t5manual-dcbi">
+  <div class="hdr">
+    <div class="hdr-back" onclick="goBack('t5manual-dcbi')">‹</div>
+    <div class="hdr-info">
+      <div class="hdr-title">Novo DCBI</div>
+      <div class="hdr-sub" id="t5md-sub">Cadastro manual</div>
+    </div>
+    <div class="hdr-badge">T5</div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-track"><div class="progress-fill" style="width:52%"></div></div>
+    <div class="progress-label">Cadastrar DCBI</div>
+  </div>
+  <div class="body">
+    <div class="field"><label>Tipo de válvula principal</label>
+      <select id="md-tipo-valvula"><option>Válvula tripartida</option><option>Gaveta</option><option>Esfera</option><option>Outro</option></select>
+    </div>
+    <div class="field"><label>Bitola da válvula</label>
+      <select id="md-bitola"><option>1/4"</option><option>3/8"</option><option>1/2"</option><option>3/4"</option><option>1"</option><option>1.1/4"</option><option>1.1/2"</option><option>2"</option></select>
+    </div>
+    <div class="field"><label>Conexões necessárias</label>
+      <textarea id="md-conexoes" rows="3" placeholder="Ex: 2x niple 1/2&quot; inox, 1x bucha redutora"></textarea>
+    </div>
+    <div class="field">
+      <label>Lacre de segurança</label>
+      <label style="display:flex;align-items:center;gap:10px;font-weight:600"><input type="checkbox" id="md-lacre"> Sim</label>
+    </div>
+    <div class="field">
+      <label>Plaqueta de aviso</label>
+      <label style="display:flex;align-items:center;gap:10px;font-weight:600"><input type="checkbox" id="md-plaqueta"> Sim</label>
+    </div>
+    <div class="field"><label>Observações</label>
+      <textarea id="md-obs" rows="3" placeholder="Opcional"></textarea>
+    </div>
+  </div>
+  <div class="bot bot-single">
+    <button class="btn btn-primary" onclick="confirmManualDCBI()">Confirmar →</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
 <!-- T6 — QUANTIDADE                                             -->
 <!-- ════════════════════════════════════════════════════════════ -->
 <div class="screen hidden" id="scr-t6">
@@ -861,7 +911,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 <!-- ════════════════════════════════════════════════════════════ -->
 <div class="screen hidden" id="scr-t6b">
   <div class="hdr">
-    <div class="hdr-back" onclick="goBack('t6b')">‹</div>
+    <div class="hdr-back" onclick="t6bConfirmarConexoes()">‹</div>
     <div class="hdr-info">
       <div class="hdr-title">Conexões de Montagem</div>
       <div class="hdr-sub" id="t6b-item-name">Acessório</div>
@@ -1158,7 +1208,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzaYkBqamEi21pTaBl_LYAhj9JkkxwFGfapWMrUCnfTCA7BMV9O5D0fWQeQP2fmGnKd/exec';
 
 // S17 — Correções cirúrgicas: snapshot pré-envio, reconciliação Fase 2, cache Atualizar
-const APP_VERSION = 'S17.3-Beta-RC1';
+const APP_VERSION = 'S20.0';
 
 // ════════════════════════════════════════════════════════════════
 // ESTADO DA SESSÃO
@@ -1186,6 +1236,9 @@ const SES = {
 
   // Levantamento acumulado por equipamento
   levantamento: {},  // { id_equip: [items...] }
+  servicosSelecionados: [],
+  fotoEquipamento: {},
+  fotoPontoInstalacao: {},
 
   // histórico de telas para back
   history: [],
@@ -1324,7 +1377,6 @@ function getTogVal(group) {
 
 function goBack(from) {
   if (!SES.history.length) return;
-  if (from === 't6b') SES.conexoesMontagem = [];
   const prev = SES.history.pop();
   const curr = document.getElementById('scr-' + from);
   const back = document.getElementById('scr-' + prev);
@@ -1332,6 +1384,129 @@ function goBack(from) {
   back.classList.remove('hidden');
   back.classList.remove('out');
   currentScreen = prev;
+}
+
+// ════════════════════════════════════════════════════════════════
+// S20.0 — MODAIS DE FOTO
+// ════════════════════════════════════════════════════════════════
+function resizeImageFileToBase64(file, maxDim=800, quality=0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          const ratio = Math.min(maxDim / w, maxDim / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function abrirModalFoto({ titulo, subtitulo, onConfirm, onSkip }) {
+  const old = document.getElementById('dlg-foto-overlay');
+  if (old) old.remove();
+  let fotoBase64 = null;
+  const dlg = document.createElement('div');
+  dlg.id = 'dlg-foto-overlay';
+  dlg.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end';
+  dlg.innerHTML = `
+    <div style="background:var(--surf);border-radius:16px 16px 0 0;padding:20px;width:100%;max-height:85vh;overflow-y:auto">
+      <div style="font-weight:800;font-size:18px;margin-bottom:6px;color:var(--text)">${titulo}</div>
+      <div style="font-size:13px;color:var(--text2);line-height:1.4;margin-bottom:14px">${subtitulo}</div>
+      <input type="file" id="dlg-foto-input" accept="image/*" capture="environment" style="display:none">
+      <button class="btn btn-ghost" id="dlg-foto-btn" style="width:100%;margin-bottom:12px">📷 Tirar foto</button>
+      <div id="dlg-foto-preview-wrap" style="display:none;margin-bottom:12px">
+        <img id="dlg-foto-preview" alt="Prévia da foto" style="width:100%;max-height:260px;object-fit:cover;border-radius:12px;border:1px solid var(--border)">
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" id="dlg-foto-pular" style="flex:1">Pular →</button>
+        <button class="btn btn-primary" id="dlg-foto-confirmar" style="flex:1;opacity:.45" disabled>Confirmar →</button>
+      </div>
+    </div>`;
+  document.body.appendChild(dlg);
+  const input = document.getElementById('dlg-foto-input');
+  const btnFoto = document.getElementById('dlg-foto-btn');
+  const btnConfirm = document.getElementById('dlg-foto-confirmar');
+  btnFoto.onclick = () => input.click();
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      btnFoto.textContent = 'Processando foto…';
+      fotoBase64 = await resizeImageFileToBase64(file);
+      document.getElementById('dlg-foto-preview').src = fotoBase64;
+      document.getElementById('dlg-foto-preview-wrap').style.display = '';
+      btnConfirm.disabled = false;
+      btnConfirm.style.opacity = '1';
+      btnFoto.textContent = '📷 Trocar foto';
+    } catch(e) {
+      btnFoto.textContent = '📷 Tirar foto';
+      showToast('Não foi possível processar a foto', 'err');
+    }
+  };
+  document.getElementById('dlg-foto-pular').onclick = () => {
+    dlg.remove();
+    if (typeof onSkip === 'function') onSkip();
+  };
+  btnConfirm.onclick = () => {
+    if (!fotoBase64) return;
+    dlg.remove();
+    if (typeof onConfirm === 'function') onConfirm(fotoBase64);
+  };
+}
+
+function solicitarFotoEquipamento(callback) {
+  if (!SES.equip?.id_equipamento) { callback(); return; }
+  const id = SES.equip.id_equipamento;
+  abrirModalFoto({
+    titulo: '📷 Foto do Equipamento',
+    subtitulo: 'Tire uma foto que mostre o local de instalação do equipamento e seus acessórios.',
+    onConfirm: (foto) => {
+      SES.fotoEquipamento = SES.fotoEquipamento || {};
+      SES.fotoEquipamento[id] = foto;
+      callback();
+    },
+    onSkip: () => {
+      SES.fotoEquipamento = SES.fotoEquipamento || {};
+      if (!(id in SES.fotoEquipamento)) SES.fotoEquipamento[id] = null;
+      callback();
+    }
+  });
+}
+
+function solicitarFotoPontoInstalacao(tipo, callback) {
+  if (!SES.equip?.id_equipamento) { callback(); return; }
+  const key = SES.equip.id_equipamento + '_' + tipo;
+  const tipoLabel = ({ manometro:'Manômetro', valvula:'Válvula de Segurança', purgador:'Purgador', dcbi:'DCBI', conexao:'Conexão', outro:'Item personalizado' }[tipo]) || (TIPO_LABEL[tipo] || tipo || 'acessório');
+  abrirModalFoto({
+    titulo: '📷 Ponto de Instalação',
+    subtitulo: `Foto do ponto onde será instalado o ${tipoLabel} no ${SES.equip.tag}.`,
+    onConfirm: (foto) => {
+      SES.fotoPontoInstalacao = SES.fotoPontoInstalacao || {};
+      SES.fotoPontoInstalacao[key] = foto;
+      callback();
+    },
+    onSkip: () => {
+      SES.fotoPontoInstalacao = SES.fotoPontoInstalacao || {};
+      SES.fotoPontoInstalacao[key] = null;
+      callback();
+    }
+  });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1549,7 +1724,8 @@ function salvarRascunhoLevantamento() {
   try {
     if (!SES.os?.id_os || !SES.inspetor?.id_inspetor) return;
     const totalItens = Object.values(SES.levantamento || {}).reduce((s,a)=>s+a.length, 0);
-    if (totalItens === 0) {
+    const totalServicos = (SES.servicosSelecionados || []).length;
+    if (totalItens === 0 && totalServicos === 0) {
       limparRascunhoLevantamento();
       return;
     }
@@ -1561,7 +1737,12 @@ function salvarRascunhoLevantamento() {
       os: SES.os,
       equipamentos: SES.equipamentos || [],
       levantamento: SES.levantamento || {},
-      total_itens: totalItens
+      itens_equipamento_por_equipamento: SES.itensEquipamento_por_equipamento || {},
+      servicos_necessarios: SES.servicosSelecionados || [],
+      fotos_equipamentos: SES.fotoEquipamento || {},
+      fotos_pontos_instalacao: SES.fotoPontoInstalacao || {},
+      total_itens: totalItens,
+      total_servicos: totalServicos
     };
     // 1. Sempre salva localmente (cache primário)
     localStorage.setItem(_draftKey(), JSON.stringify(draft));
@@ -1756,7 +1937,11 @@ async function selectOS(id) {
   }
 
   SES.levantamento = {};
+  SES.servicosSelecionados = [];
+  SES.fotoEquipamento = {};
+  SES.fotoPontoInstalacao = {};
   SES.itensEquipamento = {};               // S19.1
+  SES.itensEquipamento_por_equipamento = {};
   SES.itensEquipamento_perguntados = {};   // S19.1
 
   // [CANCELAMENTO_ENVIO] BUG1-FIX: verificar se existe snapshot pré-envio para esta OS.
@@ -1764,6 +1949,9 @@ async function selectOS(id) {
   const snapExistente = _lerSnapshotPreEnvio(id);
   if (snapExistente && snapExistente.levantamento && Object.keys(snapExistente.levantamento).length > 0) {
     SES.levantamento = JSON.parse(JSON.stringify(snapExistente.levantamento));
+    SES.servicosSelecionados = Array.isArray(snapExistente.servicos_necessarios) ? snapExistente.servicos_necessarios : [];
+    SES.fotoEquipamento = snapExistente.fotos_equipamentos || {};
+    SES.fotoPontoInstalacao = snapExistente.fotos_pontos_instalacao || {};
     console.log('[CANCELAMENTO_ENVIO] Snapshot restaurado para OS', id, '— itens:', Object.values(SES.levantamento).flat().length);
     showToast('Itens anteriores restaurados. Edite e reenvie.', 'warn');
     // [DRAFT_LOCAL] S17 — snapshot tem prioridade; descartar draft conflitante se existir
@@ -1793,10 +1981,14 @@ async function selectOS(id) {
       );
       if (restaurar) {
         SES.levantamento = JSON.parse(JSON.stringify(draftParaOfeреcer.levantamento));
+        SES.servicosSelecionados = Array.isArray(draftParaOfeреcer.servicos_necessarios) ? draftParaOfeреcer.servicos_necessarios : [];
+        SES.itensEquipamento_por_equipamento = draftParaOfeреcer.itens_equipamento_por_equipamento || {};
+        SES.fotoEquipamento = draftParaOfeреcer.fotos_equipamentos || {};
+        SES.fotoPontoInstalacao = draftParaOfeреcer.fotos_pontos_instalacao || {};
         if (Array.isArray(draftParaOfeреcer.equipamentos) && draftParaOfeреcer.equipamentos.length) {
           SES._draftEquips = draftParaOfeреcer.equipamentos;
         }
-        showToast('Rascunho restaurado: ' + draftParaOfeреcer.total_itens + ' itens recuperados', 'ok');
+        showToast('Rascunho restaurado: ' + (draftParaOfeреcer.total_itens || 0) + ' itens e ' + (draftParaOfeреcer.total_servicos || 0) + ' serviços recuperados', 'ok');
       } else {
         limparRascunhoLevantamento(id);
         if (GAS_URL) { try { gasPost('limparDraftFieldTap', { id_os: id, id_inspetor: SES.inspetor?.id_inspetor, fase: String(SES.os?.fase_atual || '1'), motivo: 'cancelado' }); } catch(e) {} }
@@ -1950,7 +2142,7 @@ function renderT3() {
 
 function selectEquip(id) {
   SES.equip = SES.equipamentos.find(e => e.id_equipamento === id);
-  renderT4();
+  solicitarFotoEquipamento(function() { renderT4(); });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -1998,8 +2190,9 @@ async function salvarNovoEquip() {
   try { salvarRascunhoLevantamento(); } catch(e) {}
   hideLoading();
   closeDialog('modal-novoequip');
-  renderT3();
+  SES.equip = obj;
   showToast('Equipamento cadastrado ✓');
+  solicitarFotoEquipamento(function() { renderT4(); });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2008,7 +2201,47 @@ async function salvarNovoEquip() {
 function renderT4() {
   document.getElementById('t4-equip-tag').textContent = SES.equip.tag;
   document.getElementById('t4-equip-tipo').textContent = EQUIP_TIPO_LABEL[SES.equip.tipo] || SES.equip.tipo;
+  SES.servicosSelecionados = SES.servicosSelecionados || [];
+  renderServicosT4();
   goTo('t4');
+}
+
+const SERVICOS_NECESSARIOS = [
+  { id:'calib_manometro', label:'Calibração de Manômetro existente' },
+  { id:'insp_valv_seguranca', label:'Inspeção de Válvula de Segurança' },
+  { id:'insp_valv_quebra_vacuo', label:'Inspeção de Válvula Quebra Vácuo' },
+  { id:'insp_valv_alivio', label:'Inspeção de Válvula de Alívio' },
+  { id:'insp_valv_alivio_qv', label:'Inspeção de Válvula Alívio/Quebra Vácuo' },
+  { id:'inst_purgador', label:'Instalação de Purgador' },
+];
+
+function renderServicosT4() {
+  const el = document.getElementById('t4-servicos-grid');
+  if (!el) return;
+  const sel = SES.servicosSelecionados || [];
+  el.innerHTML = SERVICOS_NECESSARIOS.map(srv => {
+    const ativo = sel.includes(srv.id);
+    return `<div class="kit-opt ${ativo?'sel':''}" id="srv-${srv.id}" onclick="toggleServico('${srv.id}')" style="display:flex;align-items:center;gap:12px;padding:12px">
+      <div style="flex:1"><div style="font-weight:600">${srv.label}</div></div>
+      <div class="srv-check" style="font-size:18px">${ativo?'✓':'○'}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleServico(id) {
+  SES.servicosSelecionados = SES.servicosSelecionados || [];
+  if (SES.servicosSelecionados.includes(id)) {
+    SES.servicosSelecionados = SES.servicosSelecionados.filter(x => x !== id);
+  } else {
+    SES.servicosSelecionados.push(id);
+  }
+  renderServicosT4();
+  try { salvarRascunhoLevantamento(); } catch(e) {}
+}
+
+function abrirItensEquipamento() {
+  SES._t6eq_callback = function() { renderT4(); };
+  renderT6eq();
 }
 
 const TIPO_LABEL = { manometro:'Manômetros', valvula:'Válvulas de Segurança', purgador:'Purgadores', dcbi:'DCBIs', conexao:'Conexões', outro:'Item personalizado' };
@@ -2019,8 +2252,10 @@ function selectTipo(tipo) {
   SES.itemCatalogo = null;
   SES.kitSel = null;
   SES.escalaInicio = null; SES.escalaFim = null; SES.escalaUnidade = null;
-  if (tipo === 'outro') { renderT5Outro(); return; }
-  renderT5(tipo);
+  solicitarFotoPontoInstalacao(tipo, function() {
+    if (tipo === 'outro') { renderT5Outro(); return; }
+    renderT5(tipo);
+  });
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2049,12 +2284,12 @@ function renderCatItems() {
       <div class="cat-item-detail">${getCatDetail(tipo, item)}</div>
       <div class="cat-item-badges">${getCatBadges(tipo, item)}</div>
     </div>`).join('');
-  const labelBtn = (SES.tipo === 'manometro' || SES.tipo === 'valvula')
+  const labelBtn = (SES.tipo === 'manometro' || SES.tipo === 'valvula' || SES.tipo === 'dcbi')
     ? 'Lançar manualmente'
     : 'Não encontrei no catálogo';
-  const subBtn = (SES.tipo === 'manometro' || SES.tipo === 'valvula')
-    ? 'Cadastrar novo item completo'
-    : 'Registrar manualmente';
+  const subBtn = SES.tipo === 'dcbi'
+    ? 'Preencher dados completos do DCBI'
+    : ((SES.tipo === 'manometro' || SES.tipo === 'valvula') ? 'Cadastrar novo item completo' : 'Registrar manualmente');
   html += `<div class="cat-notfound" onclick="itemNaoEncontrado()">
     <div style="font-size:24px;margin-bottom:6px">✏️</div>
     <div style="font-size:15px;font-weight:600">${labelBtn}</div>
@@ -2105,6 +2340,7 @@ function selectCatItem(id) {
 function itemNaoEncontrado() {
   if (SES.tipo === 'manometro') renderT5ManualManom();
   else if (SES.tipo === 'valvula') renderT5ManualValv();
+  else if (SES.tipo === 'dcbi') renderT5ManualDCBI();
   else renderT5Outro();
 }
 
@@ -2482,6 +2718,45 @@ function confirmManualValv() {
 }
 
 // ════════════════════════════════════════════════════════════════
+// T5-MANUAL-DCBI
+// ════════════════════════════════════════════════════════════════
+function renderT5ManualDCBI() {
+  document.getElementById('t5md-sub').textContent = SES.equip?.tag + ' · ' + (EQUIP_TIPO_LABEL[SES.equip?.tipo]||'');
+  document.getElementById('md-tipo-valvula').value = 'Válvula tripartida';
+  document.getElementById('md-bitola').value = '1/4"';
+  document.getElementById('md-conexoes').value = '';
+  document.getElementById('md-lacre').checked = false;
+  document.getElementById('md-plaqueta').checked = false;
+  document.getElementById('md-obs').value = '';
+  goTo('t5manual-dcbi');
+}
+
+function confirmManualDCBI() {
+  const tipoValvula = document.getElementById('md-tipo-valvula').value;
+  const bitola = document.getElementById('md-bitola').value;
+  const conexoes = document.getElementById('md-conexoes').value.trim();
+  const lacre = document.getElementById('md-lacre').checked;
+  const plaqueta = document.getElementById('md-plaqueta').checked;
+  const obs = document.getElementById('md-obs').value.trim();
+  const desc = `DCBI manual ${bitola} · ${tipoValvula}`;
+  SES.itemCatalogo = {
+    id: null,
+    tipo: 'dcbi',
+    desc_curta: desc,
+    requer_calibracao: 'false',
+    lancamento_manual: true,
+    tipo_valvula_principal: tipoValvula,
+    bitola_valvula: bitola,
+    conexoes_necessarias: conexoes,
+    lacre_seguranca: lacre,
+    plaqueta_aviso: plaqueta,
+    observacoes: obs
+  };
+  SES.kitSel = null;
+  goToT6();
+}
+
+// ════════════════════════════════════════════════════════════════
 // T6 — QUANTIDADE
 // ════════════════════════════════════════════════════════════════
 function goToT6() {
@@ -2535,7 +2810,7 @@ function confirmQty() {
   SES.quantidade = parseInt(document.getElementById('qtyDisplay')?.textContent) || SES.quantidade || 1;
   SES.conexoesMontagem = [];
   SES.itensAdicionais = {};
-  if (['manometro','valvula','purgador'].includes(SES.tipo)) {
+  if (['manometro','valvula','purgador','dcbi'].includes(SES.tipo)) {
     renderT6b();
   } else {
     goToT7();
@@ -2709,7 +2984,9 @@ function t6cConfirmar() {
 // T6eq — ITENS DO EQUIPAMENTO (S19.1)
 // ════════════════════════════════════════════════════════════════
 function renderT6eq() {
-  SES.itensEquipamento = SES.itensEquipamento || {};
+  SES.itensEquipamento_por_equipamento = SES.itensEquipamento_por_equipamento || {};
+  const eqId = SES.equip?.id_equipamento;
+  SES.itensEquipamento = { ...(SES.itensEquipamento_por_equipamento[eqId] || SES.itensEquipamento || {}) };
   document.getElementById('t6eq-equip-name').textContent =
     SES.equip.tag + ' · ' + (EQUIP_TIPO_LABEL[SES.equip.tipo] || '');
   const el = document.getElementById('t6eq-itens-grid');
@@ -2737,8 +3014,10 @@ function t6eqToggle(id, el) {
 
 function t6eqConfirmar() {
   SES.itensEquipamento_perguntados = SES.itensEquipamento_perguntados || {};
+  SES.itensEquipamento_por_equipamento = SES.itensEquipamento_por_equipamento || {};
   SES.itensEquipamento_perguntados[SES.equip.id_equipamento] = true;
-  const cb = SES._t6eq_callback || goToT6c;
+  SES.itensEquipamento_por_equipamento[SES.equip.id_equipamento] = { ...(SES.itensEquipamento || {}) };
+  const cb = SES._t6eq_callback || function() { renderT4(); };
   SES._t6eq_callback = null;
   cb();
 }
@@ -2754,16 +3033,16 @@ function goToT6eq_seNecessario(callback) {
 }
 
 function goToT6c() {
-  if (['manometro','valvula','purgador'].includes(SES.tipo)) {
+  if (['manometro','valvula','purgador','dcbi'].includes(SES.tipo)) {
     renderT6c();
   } else {
     _renderT7();
   }
 }
 
-// S19.1 — fluxo: T6b → T6eq (1ª vez por equip) → T6c → T7
+// S20.0 — fluxo: T6b → T7 (T6eq é acessado manualmente em T4)
 function goToT7() {
-  goToT6eq_seNecessario(goToT6c);
+  _renderT7();
 }
 
 function _renderT7() {
@@ -2877,17 +3156,42 @@ function saveCurrentItemToLevantamento() {
     componentes_kit: kitComps,
     ajuste_kit: '',
     requer_calibracao: item?.requer_calibracao || 'false',
-    requer_lacre: 'false',
+    requer_lacre: item?.lacre_seguranca ? 'true' : 'false',
+    lancamento_manual: item?.lancamento_manual || false,
+    tipo_valvula_principal: item?.tipo_valvula_principal || '',
+    bitola_valvula: item?.bitola_valvula || '',
+    conexoes_necessarias: item?.conexoes_necessarias || '',
+    lacre_seguranca: item?.lacre_seguranca || false,
+    plaqueta_aviso: item?.plaqueta_aviso || false,
+    observacoes: item?.observacoes || '',
+    servicos_necessarios: JSON.stringify(SES.servicosSelecionados || []),
     instalado_imediatamente: SES.situacao === 'agora' ? 'true' : 'false',
     conexoes_montagem: JSON.stringify(SES.conexoesMontagem || []),
     itens_adicionais: JSON.stringify(SES.itensAdicionais || {}),
-    itens_equipamento: JSON.stringify(SES.itensEquipamento || {}),  // S19.1
+    itens_equipamento: JSON.stringify((SES.itensEquipamento_por_equipamento || {})[eqId] || SES.itensEquipamento || {}),  // S19.1
     // [OUTRO_TIPO] S17 — marca explícita para renderização correta na revisão
     _veio_de_outro: (SES.tipo === 'outro') ? 'true' : 'false',
   });
   // [DRAFT_LOCAL] S17 — salvar rascunho após cada item adicionado
   try { salvarRascunhoLevantamento(); } catch(e) {}
   showToast('Item adicionado ✓');
+}
+
+function escalaItemTexto(it) {
+  if (it.escala_inicio === '' || it.escala_inicio === undefined || it.escala_inicio === null) return '';
+  return `${it.escala_inicio}-${it.escala_fim} ${it.escala_unidade}`.trim();
+}
+
+function descricaoSemEscalaDuplicada(desc, escala) {
+  if (!desc || !escala) return desc || '';
+  const variantes = [escala, escala.replace(/-/g, '–'), escala.replace(/–/g, '-')];
+  let out = String(desc);
+  variantes.forEach(v => {
+    out = out.split(' · ' + v).join('');
+    out = out.split(v + ' · ').join('');
+    out = out.split(v).join('');
+  });
+  return out.replace(/\s+·\s+$/,'').replace(/^\s+·\s+/,'').trim();
 }
 
 // ════════════════════════════════════════════════════════════════
@@ -2897,13 +3201,22 @@ function showRevision() {
   const lev = SES.levantamento;
   const equips = SES.equipamentos;
   const totalItens = Object.values(lev).reduce((s,a)=>s+a.length,0);
+  const servicos = SES.servicosSelecionados || [];
   document.getElementById('tr-os-num').textContent = 'OS ' + (SES.os.numero_os || SES.os.id_os);
-  document.getElementById('tr-total-label').textContent = totalItens + ' item' + (totalItens!==1?'s':'') + ' · ' + Object.keys(lev).length + ' equip.';
-  if (totalItens === 0) {
+  document.getElementById('tr-total-label').textContent = totalItens + ' item' + (totalItens!==1?'s':'') + ' · ' + Object.keys(lev).length + ' equip. · ' + servicos.length + ' serviço' + (servicos.length!==1?'s':'');
+  if (totalItens === 0 && servicos.length === 0) {
     document.getElementById('tr-body').innerHTML = `
       <div class="empty-state"><div class="ei">📋</div>Nenhum item registrado ainda.<br>Selecione um equipamento para começar.</div>`;
   } else {
     let html = '';
+    if (servicos.length) {
+      const labels = Object.fromEntries(SERVICOS_NECESSARIOS.map(s => [s.id, s.label]));
+      html += `<div class="rev-equip"><div class="rev-equip-hdr"><span style="font-size:20px">🛠️</span><div><div class="rev-equip-tag">Serviços necessários</div><div class="rev-equip-tipo">${servicos.length} serviço${servicos.length>1?'s':''} selecionado${servicos.length>1?'s':''}</div></div></div>`;
+      servicos.forEach(id => {
+        html += `<div class="rev-item"><div class="rev-item-info"><div class="rev-item-name">${labels[id] || id}</div><div class="rev-item-detail">Serviço sem novo acessório cadastrado</div></div></div>`;
+      });
+      html += `</div>`;
+    }
     equips.forEach(e => {
       const items = lev[e.id_equipamento] || [];
       if (!items.length) return;
@@ -2918,16 +3231,18 @@ function showRevision() {
       items.forEach((it, idx) => {
         // [OUTRO_TIPO] S17 — quando item veio de "Outro", mostrar tipo digitado em destaque
         const ehOutroPersonalizado = String(it._veio_de_outro) === 'true' && it.tipo_acessorio;
+        const escalaTxt = escalaItemTexto(it);
+        const descTitulo = descricaoSemEscalaDuplicada(it.descricao_curta, escalaTxt);
         const blocoTitulo = ehOutroPersonalizado
           ? `<div class="rev-item-name"><strong>${it.tipo_acessorio}</strong></div>
-             <div style="font-size:13px;color:var(--text2);margin-top:2px">${it.descricao_curta}</div>`
-          : `<div class="rev-item-name">${it.descricao_curta}</div>`;
+             <div style="font-size:13px;color:var(--text2);margin-top:2px">${descTitulo}</div>`
+          : `<div class="rev-item-name">${descTitulo}</div>`;
         html += `<div class="rev-item">
           <div class="rev-item-info">
             ${blocoTitulo}
             <div class="rev-item-detail">
               Qtd: ${it.quantidade}
-              ${it.escala_inicio !== '' && it.escala_inicio !== undefined ? ` · ${it.escala_inicio}–${it.escala_fim} ${it.escala_unidade}` : ''}
+              ${escalaTxt ? ` · ${escalaTxt}` : ''}
               ${it.id_kit ? ' · Kit incl.' : ''}
             </div>
             <div style="margin-top:4px">
@@ -2969,7 +3284,8 @@ function addItemToEquip(eqId) {
 async function enviarLevantamento(btn) {
   const lev = SES.levantamento;
   const totalItens = Object.values(lev).reduce((s,a)=>s+a.length,0);
-  if (totalItens === 0) { showToast('Nenhum item registrado', 'err'); return; }
+  const totalServicos = (SES.servicosSelecionados || []).length;
+  if (totalItens === 0 && totalServicos === 0) { showToast('Nenhum item ou serviço registrado', 'err'); return; }
   if (btn) btnLoading(btn, 3000);
   showLoading('Enviando levantamento…');
   const allItems = [];
@@ -2983,6 +3299,9 @@ async function enviarLevantamento(btn) {
     numero_os: SES.os.numero_os || SES.os.id_os,
     fase: SES.os.fase_atual || '1',
     levantamento: JSON.parse(JSON.stringify(SES.levantamento)),
+    servicos_necessarios: JSON.parse(JSON.stringify(SES.servicosSelecionados || [])),
+    fotos_equipamentos: JSON.parse(JSON.stringify(SES.fotoEquipamento || {})),
+    fotos_pontos_instalacao: JSON.parse(JSON.stringify(SES.fotoPontoInstalacao || {})),
     equipamentos: JSON.parse(JSON.stringify(SES.equipamentos || [])),
     os: JSON.parse(JSON.stringify(SES.os)),
     timestamp: new Date().toISOString(),
@@ -2999,7 +3318,10 @@ async function enviarLevantamento(btn) {
     id_cliente: SES.os.id_cliente,
     fase: SES.os.fase_atual || '1',
     timestamp: new Date().toISOString(),
-    itens: allItems
+    itens: allItems,
+    servicos_necessarios: SES.servicosSelecionados || [],
+    fotos_equipamentos: SES.fotoEquipamento || {},
+    fotos_pontos_instalacao: SES.fotoPontoInstalacao || {}
   };
 
   // [CANCELAMENTO_ENVIO] BUG1-FIX: passar id_levantamento existente se for reenvio após cancelamento
