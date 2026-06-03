@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TapControl Field — S22.0 — Engetap</title>
+<title>TapControl Field — S23.1 — Engetap</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -272,12 +272,50 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
   border-color: var(--accent);
   color: var(--accent2);
 }
+/* ── BACK GUARD (proteção contra fechamento acidental) ── */
+.back-guard { display: none; position: fixed; inset: 0; background: rgba(10,20,50,.85); z-index: 9999; align-items: center; justify-content: center; padding: 24px; }
+.back-guard.open { display: flex; }
+.back-guard-box { background: var(--surf); border-radius: 16px; padding: 28px 24px; max-width: 340px; width: 100%; text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.4); }
+.back-guard-box h3 { font-family: var(--head); font-size: 22px; font-weight: 800; text-transform: uppercase; color: #dc2626; margin-bottom: 10px; }
+.back-guard-box p { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 22px; }
+.back-guard-actions { display: flex; gap: 10px; }
+.btn-guard-stay { flex: 1; padding: 12px 16px; border-radius: 10px; border: none; background: var(--accent); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; font-family: var(--body); }
+.btn-guard-leave { flex: 1; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); background: transparent; color: var(--text2); font-size: 14px; font-weight: 600; cursor: pointer; font-family: var(--body); }
+
+/* ── RESTORE BANNER (rascunho recuperado) ── */
+.restore-banner { display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 500; align-items: center; gap: 10px; background: #fef3c7; border-bottom: 2px solid #fde68a; padding: 10px 14px; font-size: 13px; color: #92400e; }
+.restore-banner.visible { display: flex; }
+.restore-banner strong { font-weight: 700; }
+.restore-banner-actions { display: flex; gap: 6px; margin-left: auto; }
+.btn-restore { padding: 6px 12px; border-radius: 7px; border: none; background: #d97706; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; font-family: var(--body); }
+.btn-discard { padding: 6px 10px; border-radius: 7px; border: 1px solid #fde68a; background: transparent; color: #92400e; font-size: 12px; cursor: pointer; }
 </style>
 </head>
 <body>
 
-<!-- ════════════════════════════════════════════════════════════ -->
-<!-- T1 — LOGIN / PIN                                            -->
+<!-- ── BACK GUARD — proteção contra fechamento acidental ── -->
+<div class="back-guard" id="backGuard">
+  <div class="back-guard-box">
+    <h3>⚠️ Levantamento em andamento</h3>
+    <p>Você tem um levantamento em andamento.<br>
+      O rascunho foi salvo automaticamente, mas <b>confirme antes de sair.</b></p>
+    <div class="back-guard-actions">
+      <button class="btn-guard-stay" onclick="guardarFicar()">Continuar aqui</button>
+      <button class="btn-guard-leave" onclick="guardarSair()">Sair mesmo assim</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── RESTORE BANNER — rascunho de sessão anterior ── -->
+<div class="restore-banner" id="restoreBanner">
+  <span>📋 Rascunho salvo encontrado: <strong id="restoreBannerInfo"></strong></span>
+  <div class="restore-banner-actions">
+    <button class="btn-restore" onclick="restaurarRascunho()">Restaurar</button>
+    <button class="btn-discard" onclick="descartarRascunho()">✕</button>
+  </div>
+</div>
+
+
 <!-- ════════════════════════════════════════════════════════════ -->
 <div class="screen" id="scr-t1">
   <div class="gas-row">
@@ -288,7 +326,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
     <div class="pin-logo">
       <div class="pl-badge">FIELD</div>
       <div class="pl-name">TapControl</div>
-      <div class="pl-sub">Engetap · S22.0</div>
+      <div class="pl-sub">Engetap · S23.1</div>
     </div>
     <div class="pin-dots" id="pinDots">
       <div class="pin-dot" id="pd0"></div>
@@ -1208,7 +1246,7 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzaYkBqamEi21pTaBl_LYAhj9JkkxwFGfapWMrUCnfTCA7BMV9O5D0fWQeQP2fmGnKd/exec';
 
 // S17 — Correções cirúrgicas: snapshot pré-envio, reconciliação Fase 2, cache Atualizar
-const APP_VERSION = 'S22.0';
+const APP_VERSION = 'S23.1';
 
 // ════════════════════════════════════════════════════════════════
 // ESTADO DA SESSÃO
@@ -1578,6 +1616,7 @@ async function afterLogin() {
     SES._osList = getDemoOS();
     setGASStatus('', 'Modo demo local');
     renderT2();
+    setTimeout(verificarRascunhoAposLogin, 500);
     return;
   }
   // Em produção: carregar do GAS sem fallback para demo
@@ -1614,6 +1653,8 @@ async function afterLogin() {
   }
   if (!SES.kits || !SES.kits.length) SES.kits = SES.catalogo.kits || [];
   renderT2();
+  // [BACK_GUARD] S23.1 — verificar se há rascunho de sessão anterior
+  setTimeout(verificarRascunhoAposLogin, 500);
 }
 
 function getDemoOS() {
@@ -3810,15 +3851,145 @@ window.addEventListener('DOMContentLoaded', () => {
     setGASStatus('','Modo demo local');
     document.getElementById('gasDot').style.background='var(--warn)';
   }
-  // [DRAFT_LOCAL] S17 — garantir persistência do rascunho em fechamento brusco
-  window.addEventListener('beforeunload', function() {
+  // [BACK_GUARD] S23.1 — proteção contra fechamento acidental
+  setupBackGuard();
+  // Verificar rascunho de sessão anterior
+  verificarRascunhoAnterior();
+});
+
+// ════════════════════════════════════════════════════════════════
+// BACK GUARD — proteção contra fechamento/saída acidental
+// ════════════════════════════════════════════════════════════════
+let _allowLeave = false;
+
+function temLevantamentoEmAndamento() {
+  // Considera "em andamento" se o usuário está em tela de levantamento (T3+)
+  // e há ao menos 1 item no levantamento acumulado ou OS selecionada
+  if (!SES || !SES.inspetor) return false;
+  if (currentScreen === 't1' || currentScreen === 't2') return false;
+  if (SES.os && SES.os.id_os) return true;
+  const levItems = Object.values(SES.levantamento || {}).flat();
+  return levItems.length > 0;
+}
+
+function setupBackGuard() {
+  // Empurra estado extra no histórico para capturar o "voltar" do mobile
+  try { history.pushState({ tcf_guard: true }, ''); } catch(e) {}
+
+  window.addEventListener('popstate', function(e) {
+    if (_allowLeave) return;
+    if (temLevantamentoEmAndamento()) {
+      // Reempurra estado para o guard continuar funcionando
+      try { history.pushState({ tcf_guard: true }, ''); } catch(e2) {}
+      // Salva rascunho preventivamente
+      try { salvarRascunhoLevantamento(); } catch(e3) {}
+      document.getElementById('backGuard').classList.add('open');
+    }
+  });
+
+  window.addEventListener('beforeunload', function(e) {
+    if (_allowLeave) return;
+    // Salva rascunho no fechamento
     try {
       if (SES && SES.os && SES.inspetor) {
         salvarRascunhoLevantamento();
       }
-    } catch(e) {}
+    } catch(err) {}
+    if (temLevantamentoEmAndamento()) {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
   });
-});
+}
+
+function guardarFicar() {
+  document.getElementById('backGuard').classList.remove('open');
+}
+
+function guardarSair() {
+  // Garante que o rascunho foi salvo antes de sair
+  try {
+    if (SES && SES.os && SES.inspetor) salvarRascunhoLevantamento();
+  } catch(e) {}
+  _allowLeave = true;
+  document.getElementById('backGuard').classList.remove('open');
+  // Tenta voltar na history
+  history.back();
+  setTimeout(() => {
+    if (window.history.length <= 2) {
+      window.close();
+    }
+  }, 300);
+}
+
+function verificarRascunhoAnterior() {
+  // Mostra banner se existe rascunho salvo de sessão anterior
+  try {
+    // Precisamos de algum id_os para checar — sem login ainda não temos
+    // O banner será exibido após login via afterLogin()
+  } catch(e) {}
+}
+
+function verificarRascunhoAposLogin() {
+  // Chamada após login bem-sucedido para checar drafts existentes
+  try {
+    // Verifica se há algum draft para este inspetor sem id_os específico
+    const insp = SES.inspetor?.id_inspetor || 'anon';
+    const prefix = 'fieldtap_draft_' + insp + '_';
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+    if (!keys.length) return;
+    // Pega o draft mais recente
+    let melhorDraft = null;
+    let melhorTs = 0;
+    keys.forEach(k => {
+      try {
+        const d = JSON.parse(localStorage.getItem(k));
+        if (d && d.timestamp_draft && d.timestamp_draft > melhorTs) {
+          melhorTs = d.timestamp_draft;
+          melhorDraft = d;
+        }
+      } catch(e2) {}
+    });
+    if (!melhorDraft) return;
+    const banner  = document.getElementById('restoreBanner');
+    const info    = document.getElementById('restoreBannerInfo');
+    const osLabel = melhorDraft.numero_os || melhorDraft.id_os || 'OS anterior';
+    const dt      = new Date(melhorTs).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+    info.textContent = osLabel + ' · ' + dt;
+    banner.classList.add('visible');
+  } catch(e) {}
+}
+
+function restaurarRascunho() {
+  // Encontra o draft mais recente deste inspetor e redireciona para a OS
+  try {
+    const insp = SES.inspetor?.id_inspetor || 'anon';
+    const prefix = 'fieldtap_draft_' + insp + '_';
+    const keys = Object.keys(localStorage).filter(k => k.startsWith(prefix));
+    let melhorDraft = null; let melhorTs = 0;
+    keys.forEach(k => {
+      try {
+        const d = JSON.parse(localStorage.getItem(k));
+        if (d && d.timestamp_draft > melhorTs) { melhorTs = d.timestamp_draft; melhorDraft = d; }
+      } catch(e) {}
+    });
+    if (!melhorDraft) return;
+    descartarRascunho();
+    // Seleciona a OS correspondente se disponível
+    if (melhorDraft.id_os && SES.listaOS) {
+      const os = SES.listaOS.find(o => o.id_os === melhorDraft.id_os);
+      if (os) { selecionarOS(os); return; }
+    }
+    showToast('OS do rascunho não encontrada na lista atual.', 'warn');
+  } catch(e) {
+    showToast('Erro ao restaurar rascunho.', 'err');
+  }
+}
+
+function descartarRascunho() {
+  document.getElementById('restoreBanner').classList.remove('visible');
+}
 </script>
 </body>
 </html>
