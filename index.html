@@ -111,6 +111,7 @@ body { background:
 .gas-dot.ok   { background: var(--ok); box-shadow: 0 0 8px rgba(34,197,94,.6); }
 .gas-dot.err  { background: var(--danger); box-shadow: 0 0 8px rgba(239,68,68,.6); }
 .gas-dot.spin { background: var(--accent); animation: spin-pulse 1s infinite; }
+.gas-dot.warn { background: var(--warn); box-shadow: 0 0 8px rgba(245,158,11,.6); }
 @keyframes spin-pulse { 0%,100%{opacity:1; box-shadow:0 0 8px rgba(14,165,233,.7)} 50%{opacity:.3; box-shadow:none} }
 
 /* ── OS CARDS ── */
@@ -1148,6 +1149,9 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
       <div class="success-title">Levantamento Enviado!</div>
       <div class="success-sub" id="tc-summary">Todos os itens foram registrados com sucesso.</div>
       <div class="success-id" id="tc-lev-id">LEV-2026-001</div>
+      <div id="tc-offline-warn" style="display:none;margin-top:12px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.35);border-radius:10px;padding:10px 14px;font-size:13px;color:var(--warn)">
+        🔴 Sem conexão no momento. O levantamento foi salvo localmente e será enviado automaticamente quando o dispositivo reconectar à internet.
+      </div>
     </div>
   </div>
   <div class="bot bot-single">
@@ -1278,7 +1282,131 @@ input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbzaYkBqamEi21pTaBl_LYAhj9JkkxwFGfapWMrUCnfTCA7BMV9O5D0fWQeQP2fmGnKd/exec';
 
 // S17 — Correções cirúrgicas: snapshot pré-envio, reconciliação Fase 2, cache Atualizar
-const APP_VERSION = 'S23.1';
+const APP_VERSION = 'S24.0';
+
+// ────────────────────────────────────────────────────────────────
+// [OFFLINE_CACHE] S24.0 — Cache local para modo offline-first
+// Estratégia: write-through. Dados são gravados no cache a cada
+// resposta bem-sucedida do GAS e lidos como fallback quando o GAS
+// não responde.
+// ────────────────────────────────────────────────────────────────
+
+const OFFLINE_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
+
+function _offlineKey(type, id) {
+  // type: 'os_list' | 'catalogos' | 'equips'
+  // id: id_inspetor para os_list/catalogos; id_os para equips
+  return 'tcf_offline_' + type + '_' + (id || 'global');
+}
+
+function _offlineSave(type, id, data) {
+  try {
+    localStorage.setItem(_offlineKey(type, id), JSON.stringify({
+      ts: Date.now(),
+      data: data
+    }));
+  } catch(e) {
+    console.warn('[OFFLINE_CACHE] falha ao salvar cache:', type, e);
+  }
+}
+
+function _offlineLoad(type, id) {
+  try {
+    const raw = localStorage.getItem(_offlineKey(type, id));
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (!entry || !entry.data) return null;
+    if (Date.now() - entry.ts > OFFLINE_CACHE_TTL_MS) {
+      localStorage.removeItem(_offlineKey(type, id));
+      return null;
+    }
+    return entry.data;
+  } catch(e) {
+    return null;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// [OFFLINE_QUEUE] S24.0 — Fila de envio para modo offline
+// Quando enviarLevantamento falha por falta de rede, o payload
+// é enfileirado e reenviado automaticamente ao recuperar conexão.
+// ────────────────────────────────────────────────────────────────
+
+const OFFLINE_QUEUE_KEY = 'tcf_offline_send_queue';
+
+function _offlineQueueLoad() {
+  try {
+    const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) { return []; }
+}
+
+function _offlineQueueSave(queue) {
+  try {
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+  } catch(e) { console.warn('[OFFLINE_QUEUE] falha ao salvar fila:', e); }
+}
+
+function _offlineQueueAdd(payload) {
+  const queue = _offlineQueueLoad();
+  // Evita duplicatas: remove entrada anterior da mesma OS/fase
+  const filtered = queue.filter(e => !(e.id_os === payload.id_os && e.fase === payload.fase));
+  filtered.push({
+    ...payload,
+    _queued_at: new Date().toISOString(),
+    _retry_count: 0
+  });
+  _offlineQueueSave(filtered);
+  console.log('[OFFLINE_QUEUE] Levantamento enfileirado:', payload.id_os);
+}
+
+function _offlineQueueRemove(id_os, fase) {
+  const queue = _offlineQueueLoad().filter(e => !(e.id_os === id_os && e.fase === fase));
+  _offlineQueueSave(queue);
+}
+
+async function _offlineQueueFlush() {
+  const queue = _offlineQueueLoad();
+  if (!queue.length) return;
+  if (!navigator.onLine) return;
+  console.log('[OFFLINE_QUEUE] Tentando enviar', queue.length, 'levantamento(s) enfileirado(s)…');
+
+  for (const entry of queue) {
+    try {
+      const r = await gasPost('enviarLevantamento', entry, 60000);
+      if (r && r.status === 'ok') {
+        _offlineQueueRemove(entry.id_os, entry.fase);
+        showToast('✅ Levantamento da OS ' + (entry.numero_os || entry.id_os) + ' enviado com sucesso!', 'ok');
+        // Limpar rascunho correspondente
+        try {
+          const insp = entry.id_inspetor || 'anon';
+          const key = 'fieldtap_draft_' + insp + '_' + entry.id_os;
+          localStorage.removeItem(key);
+        } catch(e2) {}
+        // Atualizar lista de OS se estiver na T2
+        if (SES.inspetor && currentScreen === 't2') {
+          await atualizarOSFieldTap(null);
+        }
+      } else {
+        console.warn('[OFFLINE_QUEUE] GAS rejeitou envio:', r?.mensagem);
+      }
+    } catch(e) {
+      console.warn('[OFFLINE_QUEUE] Falha ao enviar da fila (sem rede?):', e.message);
+      break; // Para de tentar se sem rede
+    }
+  }
+}
+
+// Escuta eventos de reconexão para disparar flush automaticamente
+window.addEventListener('online', () => {
+  console.log('[OFFLINE_QUEUE] Conexão restaurada — verificando fila…');
+  setTimeout(() => {
+    setGASStatus('spin', 'Reconectado — verificando envios pendentes…');
+    _offlineQueueFlush().then(() => {
+      setGASStatus('ok', 'GAS conectado ✓');
+    }).catch(() => {});
+  }, 2000);
+});
 
 // ════════════════════════════════════════════════════════════════
 // ESTADO DA SESSÃO
@@ -1652,10 +1780,26 @@ async function afterLogin() {
     return;
   }
   // Em produção: carregar do GAS sem fallback para demo
-  loadDemoData(); // carrega catálogos demo como fallback apenas para catálogos, não OS
+  // [OFFLINE_CACHE] S24.0 — carrega catálogos do cache como fallback (sobrescrito se GAS responder)
+  loadDemoData();
+  const _insp = SES.inspetor.id_inspetor;
+  const cachedCat = _offlineLoad('catalogos', _insp);
+  if (cachedCat) {
+    SES.catalogo = cachedCat;
+    SES.kits = cachedCat.kits || [];
+    console.log('[OFFLINE_CACHE] Catálogos carregados do cache offline.');
+  }
+  const cachedOS = _offlineLoad('os_list', _insp);
+  if (cachedOS) {
+    _reconciliarStoreComGAS(cachedOS);
+    SES._osList = cachedOS.filter(isOSVisivelFieldTapLocal);
+    SES._gasOSCarregado = false; // cache — não é resposta fresca do GAS
+    SES._offlineMode = true;
+    console.log('[OFFLINE_CACHE] Lista de OS carregada do cache offline:', SES._osList.length, 'OS.');
+  }
   try {
     const [rOs, rCat] = await Promise.all([
-      gasGet('getOS', { id_inspetor: SES.inspetor.id_inspetor }),
+      gasGet('getOS', { id_inspetor: _insp }),
       gasGet('getCatalogos')
     ]);
     if (rOs.status === 'ok') {
@@ -1663,10 +1807,13 @@ async function afterLogin() {
       // [FASE2_SYNC] BUG6-FIX: reconciliar localStorage no login também
       _reconciliarStoreComGAS(osRecebidas);
       SES._osList = osRecebidas.filter(isOSVisivelFieldTapLocal);
-      SES._gasOSCarregado = true; // GAS respondeu: nunca usar demo para OS
+      SES._gasOSCarregado = true;
+      SES._offlineMode = false;
+      // [OFFLINE_CACHE] S24.0 — persistir lista de OS para uso offline futuro
+      _offlineSave('os_list', _insp, osRecebidas);
     }
     if (rCat.status === 'ok') {
-      SES.catalogo = {
+      const cat = {
         manometros: rCat.manometros || [],
         valvulas:   rCat.valvulas || [],
         purgadores: rCat.purgadores || [],
@@ -1674,14 +1821,22 @@ async function afterLogin() {
         conexoes:   rCat.conexoes || [],
         kits:       rCat.kits || []
       };
+      SES.catalogo = cat;
       SES.kits = rCat.kits || [];
+      // [OFFLINE_CACHE] S24.0 — persistir catálogos para uso offline futuro
+      _offlineSave('catalogos', _insp, cat);
     }
     setGASStatus('ok', 'GAS conectado ✓');
   } catch(e) {
-    // Correção S10 — em produção GAS falhou: NÃO carregar demo de OS, mostrar erro claro
-    setGASStatus('err', 'Falha ao conectar GAS');
-    // SES._osList permanece vazio; SES._gasOSCarregado permanece false
-    // renderT2 mostrará estado de erro com botão Atualizar
+    // [OFFLINE_CACHE] S24.0 — GAS falhou mas temos cache? Seguir em modo offline
+    if (SES._osList && SES._osList.length) {
+      setGASStatus('warn', 'Modo offline — dados do cache');
+      SES._offlineMode = true;
+      console.log('[OFFLINE_CACHE] GAS indisponível — usando cache offline para OS e catálogos.');
+    } else {
+      setGASStatus('err', 'Sem conexão e sem cache local');
+      // SES._osList permanece vazio; renderT2 mostrará estado de erro
+    }
   }
   if (!SES.kits || !SES.kits.length) SES.kits = SES.catalogo.kits || [];
   renderT2();
@@ -1729,6 +1884,9 @@ async function atualizarOSFieldTap(btn) {
 
       SES._osList = osFiltradas;
       SES._gasOSCarregado = true;
+      // [OFFLINE_CACHE] S24.0 — atualizar cache offline após refresh bem-sucedido
+      _offlineSave('os_list', SES.inspetor?.id_inspetor || 'anon', osRecebidas);
+      SES._offlineMode = false;
       _lastOSRefresh = Date.now();
       setGASStatus('ok', 'GAS conectado ✓');
       renderT2();
@@ -1996,7 +2154,20 @@ function renderT2() {
     }
   }
 
-  body.innerHTML = html;
+  // [OFFLINE_CACHE] S24.0 — aviso visual quando operando com cache offline
+  const queueLen = _offlineQueueLoad().length;
+  let offlineBanner = '';
+  if (SES._offlineMode) {
+    offlineBanner = `<div style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.4);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--warn);display:flex;align-items:center;gap:8px">
+      🔴 <span><b>Modo offline</b> — exibindo dados do cache local. Toque em 🔄 para tentar reconectar.</span>
+    </div>`;
+  }
+  if (queueLen > 0) {
+    offlineBanner += `<div style="background:rgba(14,165,233,.10);border:1px solid rgba(14,165,233,.3);border-radius:12px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--accent2);display:flex;align-items:center;gap:8px">
+      ⏳ <span><b>${queueLen} levantamento${queueLen>1?'s':''} na fila</b> — será${queueLen>1?'ão':''} enviado${queueLen>1?'s':''} automaticamente ao reconectar.</span>
+    </div>`;
+  }
+  body.innerHTML = offlineBanner + html;
   // Correção S13 — clique delegado nos cards de OS pendentes (evita quebra por id_os com
   // caracteres especiais ou tipos numéricos vindos do Google Sheets quando interpolados
   // diretamente em onclick="selectOS('...')").
@@ -2088,6 +2259,8 @@ async function selectOS(id) {
       equips = r.equipamentos || [];
       SES._equipGASCarregado = true;
       SES._equipGASErro = false;
+      // [OFFLINE_CACHE] S24.0 — persistir equipamentos para uso offline futuro
+      _offlineSave('equips', id, equips);
       // Correção S12 — se OS tem total_equipamentos > 0 mas GAS retornou vazio, alerta específico
       const totalEsperado = Number(SES.os?.total_equipamentos || 0);
       if (totalEsperado > 0 && equips.length === 0) {
@@ -2103,9 +2276,18 @@ async function selectOS(id) {
     if (DEMO_MODE) {
       equips = getDemoEquips(id);
     } else {
-      equips = [];
-      SES._equipGASCarregado = false;
-      SES._equipGASErro = true;
+      // [OFFLINE_CACHE] S24.0 — GAS falhou: tentar cache offline de equipamentos
+      const cachedEquips = _offlineLoad('equips', id);
+      if (cachedEquips && cachedEquips.length) {
+        equips = cachedEquips;
+        SES._equipGASCarregado = false;
+        SES._equipGASErro = false;
+        console.log('[OFFLINE_CACHE] Equipamentos carregados do cache offline:', equips.length);
+      } else {
+        equips = [];
+        SES._equipGASCarregado = false;
+        SES._equipGASErro = true;
+      }
     }
   }
   // [DRAFT_LOCAL] S17 — se GAS não retornou equipamentos mas temos draft com equipamentos, usa draft
@@ -3454,7 +3636,25 @@ async function enviarLevantamento(btn) {
     }
   } catch(e) {
     hideLoading();
-    showToast('Falha ao enviar. Os dados foram mantidos para nova tentativa.', 'err');
+    // [OFFLINE_QUEUE] S24.0 — sem rede: enfileirar para envio posterior
+    if (!navigator.onLine || e.message === 'timeout' || e.message?.includes('Failed to fetch')) {
+      _offlineQueueAdd({
+        ...payload,
+        numero_os: SES.os.numero_os || SES.os.id_os
+      });
+      // Salvar rascunho com marcação de "na fila"
+      try { salvarRascunhoLevantamento(); } catch(e2) {}
+      showToast('🔴 Sem conexão — levantamento salvo para envio automático quando reconectar.', 'warn');
+      // Avançar para tela de confirmação offline
+      const agora = `${SES.inspetor.nome} · ${totalItens} item${totalItens>1?'s':''} — aguardando envio`;
+      document.getElementById('tc-summary').textContent = agora;
+      document.getElementById('tc-lev-id').textContent = '(pendente — sem rede)';
+      const warnEl = document.getElementById('tc-offline-warn');
+      if (warnEl) warnEl.style.display = '';
+      goTo('tc');
+    } else {
+      showToast('Falha ao enviar. Os dados foram mantidos para nova tentativa.', 'err');
+    }
     return;
   }
   hideLoading();
@@ -3887,6 +4087,10 @@ window.addEventListener('DOMContentLoaded', () => {
   setupBackGuard();
   // Verificar rascunho de sessão anterior
   verificarRascunhoAnterior();
+  // [OFFLINE_QUEUE] S24.0 — verificar fila de envios pendentes ao iniciar
+  if (navigator.onLine && GAS_URL) {
+    setTimeout(() => _offlineQueueFlush().catch(() => {}), 3000);
+  }
 });
 
 // ════════════════════════════════════════════════════════════════
